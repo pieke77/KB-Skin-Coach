@@ -67,5 +67,5 @@ Return a short, clear recommendation for up to 3 products, with brand, name, key
     answer = response["choices"][0]["message"]["content"].strip()
     return jsonify({"answer": answer})
 
-if __name__ == "__main__":
-    app.run(debug=True)
+## if __name__ == "__main__":
+##     app.run(debug=True)
