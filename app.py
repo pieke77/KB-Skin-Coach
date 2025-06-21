@@ -13,7 +13,7 @@ with open("products.jsonl", "r") as f:
         products.append(json.loads(line))
 
 # OpenAI API Key (you must set this securely)
-openai.api_key = os.getenv("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")
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 # Define known filters
 ingredient_keywords = [
