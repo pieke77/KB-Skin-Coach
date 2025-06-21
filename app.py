@@ -1,83 +1,70 @@
-# app.py
 from flask import Flask, request, jsonify
 import json
-import os
-import openai
+import re
 
 app = Flask(__name__)
 
-# Load product data from JSONL (only once on startup)
-PRODUCTS_FILE = "products.jsonl"
-with open(PRODUCTS_FILE, "r", encoding="utf-8") as f:
-    PRODUCTS = [json.loads(line) for line in f if line.strip()]
+# Load product data from JSONL
+products = []
+with open("products.jsonl", "r") as f:
+    for line in f:
+        products.append(json.loads(line))
 
-# Load OpenAI key
-openai.api_key = os.getenv("OPENAI_API_KEY")
-
-# Match vitamin C keywords
-VITAMIN_C_TERMS = [
-    "ascorbic acid", "ethyl ascorbyl ether", "sodium ascorbyl phosphate",
-    "magnesium ascorbyl phosphate", "tetrahexyldecyl ascorbate", "vitamin c"
+# Define synonym keywords for matching
+ingredient_keywords = [
+    "ascorbic acid", "vitamin c", "ethyl ascorbyl ether", "sodium ascorbyl phosphate",
+    "magnesium ascorbyl phosphate", "niacinamide", "retinol", "centella asiatica",
+    "hyaluronic acid", "zinc pca", "ceramide", "panthenol"
 ]
+skin_type_keywords = ["dry", "oily", "sensitive", "normal", "combination", "acne"]
+concern_keywords = [
+    "anti-aging", "wrinkle", "dull", "hydration", "blemish", "pores", "redness", "elasticity"
+]
+product_type_keywords = ["serum", "cream", "toner", "cleanser", "ampoule", "essence"]
 
-def match_products(query):
-    query_lower = query.lower()
-    matched = []
-    for p in PRODUCTS:
-        if any(term in query_lower for term in VITAMIN_C_TERMS):
-            full_ingredients = p.get("full_ingredients", "").lower()
-            if any(term in full_ingredients for term in VITAMIN_C_TERMS):
-                matched.append(p)
-        else:
-            summary = p.get("summary", "").lower()
-            if any(word in summary for word in query_lower.split()):
-                matched.append(p)
-    return matched[:5]
-
-@app.route("/ask", methods=["POST"])
-def ask():
+@app.route("/recommend", methods=["POST"])
+def recommend():
     data = request.json
-    query = data.get("question")
+    query = data.get("query", "").lower()
+
     if not query:
-        return jsonify({"error": "Missing question"}), 400
+        return jsonify({"error": "No query provided."}), 400
 
-    matches = match_products(query)
-    if not matches:
-        return jsonify({"answer": "Sorry, no products found matching your criteria."})
+    def matches_any(value, keywords):
+        return any(kw in value for kw in keywords)
 
-    context = "\n".join([
-        f"Brand: {p['brand']}\nProduct: {p['product_name']}\nDescription: {p['summary']}\nKey Ingredients: {', '.join(p.get('key_ingredients', []))}\nWhen to Use: {p.get('recommended_use', '')}"[:1000]
-        for p in matches
-    ])
+    def score(product):
+        score = 0
+        # Ingredients
+        full_ing = product.get("full_ingredients", "").lower()
+        act_ing = [ai.lower() for ai in product.get("active_ingredients", [])]
+        if matches_any(full_ing, ingredient_keywords) or matches_any(" ".join(act_ing), ingredient_keywords):
+            score += 3
+        # Skin type
+        if matches_any(" ".join(product.get("skin_types", [])).lower(), skin_type_keywords):
+            score += 1
+        # Concern
+        if matches_any(" ".join(product.get("concerns", [])).lower(), concern_keywords):
+            score += 1
+        # Product type
+        if matches_any(product.get("product_name", "").lower(), product_type_keywords):
+            score += 1
+        return score
 
-    prompt = f"""
-You are KBeauté’s AI skincare expert. Only use the product data below to answer:
-{context}
+    matched = sorted(products, key=score, reverse=True)
+    top_matches = matched[:3]
 
-Question: {query}
-Return a short, clear recommendation for up to 3 products, with brand, name, key ingredients and when to use.
-"""
+    results = []
+    for p in top_matches:
+        results.append({
+            "brand": p.get("brand"),
+            "product_name": p.get("product_name"),
+            "short_description": p.get("summary"),
+            "key_ingredients": p.get("active_ingredients") or [],
+            "when_to_use": p.get("recommended_use") or ""
+        })
 
-    response = openai.ChatCompletion.create(
-        model="gpt-4-turbo",
-        messages=[{"role": "system", "content": "You are a precise skincare expert."},
-                 {"role": "user", "content": prompt}]
-    )
-
-    answer = response["choices"][0]["message"]["content"].strip()
-    return jsonify({"answer": answer})
-
-from flask import Flask
-
-app = Flask(__name__)
-
-@app.route("/")
-def home():
-    return "KBeauté API is running!"
+    return jsonify({"recommendations": results})
 
 if __name__ == "__main__":
-    app.run()
-
-
-## if __name__ == "__main__":
-##    app.run(debug=True)
+    app.run(debug=True)
