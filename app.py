@@ -67,5 +67,17 @@ Return a short, clear recommendation for up to 3 products, with brand, name, key
     answer = response["choices"][0]["message"]["content"].strip()
     return jsonify({"answer": answer})
 
+from flask import Flask
+
+app = Flask(__name__)
+
+@app.route("/")
+def home():
+    return "KBeauté API is running!"
+
+if __name__ == "__main__":
+    app.run()
+
+
 ## if __name__ == "__main__":
-##     app.run(debug=True)
+##    app.run(debug=True)
