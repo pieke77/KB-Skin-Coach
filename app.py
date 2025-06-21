@@ -50,7 +50,8 @@ You are a skincare assistant. Given a customer query, extract structured fields:
         temperature=0.2
     )
 
-    filters = json.loads(gpt_response["choices"][0]["message"]["content"])
+filters = json.loads(gpt_response.choices[0].message.content)
+
 
     query_ingredients = filters.get("ingredients", [])
     query_skin_types = filters.get("skin_types", [])
