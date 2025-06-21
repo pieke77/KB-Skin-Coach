@@ -42,11 +42,14 @@ You are a skincare assistant. Given a customer query, extract structured fields:
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": query}
     ]
-    gpt_response = openai.ChatCompletion.create(
+
+    client = openai.OpenAI()
+    gpt_response = client.chat.completions.create(
         model="gpt-4o",
         messages=messages,
         temperature=0.2
     )
+
     filters = json.loads(gpt_response["choices"][0]["message"]["content"])
 
     query_ingredients = filters.get("ingredients", [])
